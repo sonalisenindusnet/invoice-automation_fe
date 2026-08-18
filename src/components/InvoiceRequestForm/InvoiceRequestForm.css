@@ -1,0 +1,175 @@
+.invoice-form {
+  max-width: 760px;
+  margin: 40px auto;
+  padding: 24px 32px 32px;
+  background: #ffffff;
+  border: 1px solid #e0e0e0;
+  border-radius: 8px;
+  font-size: 14px;
+  color: #1f2328;
+}
+
+.invoice-form__title {
+  margin: 0 0 20px;
+  font-size: 20px;
+  font-weight: 600;
+}
+
+.invoice-form__grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 16px 24px;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.field--full {
+  grid-column: 1 / -1;
+}
+
+.field label {
+  font-weight: 500;
+}
+
+.field__required {
+  color: #c1121f;
+  margin-left: 2px;
+}
+
+.field input,
+.field select,
+.field textarea {
+  padding: 8px 10px;
+  border: 1px solid #c9ccd1;
+  border-radius: 4px;
+  font-size: 14px;
+  font-family: inherit;
+  background: #fff;
+}
+
+.field input:focus,
+.field select:focus,
+.field textarea:focus {
+  outline: none;
+  border-color: #3366cc;
+}
+
+.field.has-error input,
+.field.has-error select,
+.field.has-error textarea {
+  border-color: #c1121f;
+}
+
+.field__input-group {
+  display: flex;
+}
+
+.field__input-group .field__prefix {
+  display: flex;
+  align-items: center;
+  padding: 0 10px;
+  border: 1px solid #c9ccd1;
+  border-right: none;
+  border-radius: 4px 0 0 4px;
+  background: #f2f3f5;
+  color: #4b5563;
+  font-size: 14px;
+}
+
+.field__input-group input {
+  border-radius: 0 4px 4px 0;
+  flex: 1;
+  min-width: 0;
+}
+
+.field__input--readonly {
+  background: #f2f3f5;
+  color: #4b5563;
+  cursor: default;
+}
+
+.field__hint {
+  font-size: 12px;
+  color: #6b7280;
+}
+
+.invoice-form__value-group {
+  grid-column: 1 / -1;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 16px 24px;
+}
+
+@media (max-width: 640px) {
+  .invoice-form__value-group {
+    grid-template-columns: 1fr;
+  }
+}
+
+.field__error {
+  font-size: 12px;
+  color: #c1121f;
+}
+
+.invoice-form__banner {
+  margin-top: 20px;
+  padding: 10px 14px;
+  border-radius: 4px;
+  font-size: 14px;
+}
+
+.invoice-form__banner.is-success {
+  background: #e6f4ea;
+  color: #1e7e34;
+  border: 1px solid #bfe3c8;
+}
+
+.invoice-form__banner.is-error {
+  background: #fdecea;
+  color: #c1121f;
+  border: 1px solid #f5c2c0;
+}
+
+.invoice-form__actions {
+  margin-top: 20px;
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+}
+
+.invoice-form__actions button {
+  padding: 9px 22px;
+  background: #3366cc;
+  color: #fff;
+  border: none;
+  border-radius: 4px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.invoice-form__actions button:disabled {
+  background: #9fb3dd;
+  cursor: not-allowed;
+}
+
+.invoice-form__clear {
+  background: transparent !important;
+  color: #4b5563 !important;
+  border: 1px solid #c9ccd1 !important;
+}
+
+.invoice-form__clear:disabled {
+  color: #9ca3af !important;
+  border-color: #e0e0e0 !important;
+}
+
+@media (max-width: 640px) {
+  .invoice-form__grid {
+    grid-template-columns: 1fr;
+  }
+}
