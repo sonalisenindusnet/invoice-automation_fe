@@ -71,6 +71,53 @@ export function TextAreaField({ label, name, value, error, onChange, onBlur, pla
   );
 }
 
+export function CheckboxField({ label, name, checked, error, onChange, onBlur }) {
+  return (
+    <div className={`field field--checkbox field--full ${error ? 'has-error' : ''}`}>
+      <label className="field__checkbox-label" htmlFor={name}>
+        <input id={name} name={name} type="checkbox" checked={checked} onChange={onChange} onBlur={onBlur} />
+        <span>{label}</span>
+      </label>
+      {error && <span className="field__error">{error}</span>}
+    </div>
+  );
+}
+
+// A small, single-line checkbox (checkbox + short label on one line) for
+// slotting next to a TextField/SelectField in the grid without taking up a
+// full field's worth of space.
+export function InlineCheckboxField({ label, name, checked, disabled, onChange, hint, loading, loadingText, error }) {
+  return (
+    <div className={`field field--checkbox field--checkbox-compact ${error ? 'has-error' : ''}`}>
+      <label className="field__checkbox-label" htmlFor={name}>
+        <input id={name} name={name} type="checkbox" checked={checked} disabled={disabled} onChange={onChange} />
+        <span>{label}</span>
+      </label>
+      {loading ? (
+        <span className="invoice-form__mis-loader">{loadingText}</span>
+      ) : (
+        hint && <span className="field__hint">{hint}</span>
+      )}
+      {error && <span className="field__error">{error}</span>}
+    </div>
+  );
+}
+
+export function FileField({ label, name, inputRef, fileName, accept, error, onChange, hint, optional }) {
+  return (
+    <div className={`field field--full ${error ? 'has-error' : ''}`}>
+      <label htmlFor={name}>
+        {label}
+        {!optional && <span className="field__required">*</span>}
+      </label>
+      <input id={name} name={name} type="file" ref={inputRef} accept={accept} onChange={onChange} />
+      {fileName && <span className="field__hint">Selected: {fileName}</span>}
+      {hint && !fileName && !error && <span className="field__hint">{hint}</span>}
+      {error && <span className="field__error">{error}</span>}
+    </div>
+  );
+}
+
 export function SelectField({ label, name, value, options, error, onChange, onBlur, optional }) {
   return (
     <div className={`field ${error ? 'has-error' : ''}`}>

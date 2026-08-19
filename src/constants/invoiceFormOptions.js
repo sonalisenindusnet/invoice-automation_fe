@@ -32,6 +32,10 @@ export const INITIAL_FORM_STATE = {
   clientMailCc: "",
   intCcMailId: "",
   workOrder: "",
+  // Only relevant when workOrder === 'No' — see validators.js. Not a plain
+  // string like the rest of this state, so it's handled as a special case
+  // there rather than through OPTIONAL_FIELDS below.
+  noWorkOrderConsent: false,
   masterProjectId: "",
   currency: "",
   projectValue: "",
@@ -39,6 +43,11 @@ export const INITIAL_FORM_STATE = {
   invoiceType: "",
   entity: "",
 };
+
+// Accepted evidence file types for the "no Work Order" consent section
+// (screenshots or an exported email) and a sane upload size cap.
+export const EVIDENCE_ACCEPT = "image/*,.pdf,.eml,.msg";
+export const EVIDENCE_MAX_SIZE_MB = 10;
 
 // Fields that are allowed to be left blank. Master Project ID is commonly
 // not filled in. Client Email Cc is treated as optional (CC recipients

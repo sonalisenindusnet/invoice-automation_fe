@@ -8,14 +8,38 @@
 const SAVE_INVOICE_API_URL =
   process.env.REACT_APP_SAVE_INVOICE_API_URL || 'http://localhost:5000/invoice/api/v1/invoice-generation';
 
-export async function submitInvoiceRequest(payload) {
+// File-upload (evidence) support is commented out for now — see the
+// "No Work Order" section in InvoiceRequestForm.js, which now just shows an
+// informational message instead of collecting a file. Kept here, inactive,
+// in case evidence upload comes back later.
+//
+// Previously: `file` was optional — the evidence screenshot/email attached
+// when Work Order is "No". When present, the request was sent as
+// multipart/form-data (every payload field appended alongside the file
+// under the "evidence" key) instead of plain JSON, since a file can't be
+// embedded in a JSON body. The browser sets the multipart Content-Type +
+// boundary itself, so that header must NOT be set manually in that branch.
+export async function submitInvoiceRequest(payload /*, file */) {
   let response;
   try {
+    // if (file) {
+    //   const body = new FormData();
+    //   Object.entries(payload).forEach(([key, value]) => {
+    //     body.append(key, value ?? '');
+    //   });
+    //   body.append('evidence', file, file.name);
+    //
+    //   response = await fetch(SAVE_INVOICE_API_URL, {
+    //     method: 'POST',
+    //     body,
+    //   });
+    // } else {
     response = await fetch(SAVE_INVOICE_API_URL, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload),
     });
+    // }
   } catch (networkError) {
     // fetch() throws a plain "Failed to fetch" here for anything that
     // happens BEFORE an HTTP response comes back at all — the API isn't

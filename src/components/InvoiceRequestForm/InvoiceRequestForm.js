@@ -1,16 +1,20 @@
-import { useEffect, useState } from 'react';
+import { useEffect, /* useRef, */ useState } from 'react';
 import { submitInvoiceRequest } from '../../api/invoiceApi';
+import { fetchProjectInfo } from '../../api/misApi';
 import { validateField, validateAll, computeInvoicePercentage } from '../../utils/validators';
 import { loadCachedFormData, saveCachedFormData, clearCachedFormData } from '../../utils/formCache';
+import { formatMisLabel, formatMisValue } from '../../utils/misFieldFormat';
+import { MIS_FIELD_MAP } from '../../constants/misFieldMap';
 import {
   ENTITY_OPTIONS,
   CURRENCY_BY_ENTITY,
   CURRENCY_OPTIONS,
   WORK_ORDER_OPTIONS,
   INVOICE_TYPE_OPTIONS,
+  // EVIDENCE_ACCEPT, // file upload commented out — see the "No Work Order" section below
   INITIAL_FORM_STATE,
 } from '../../constants/invoiceFormOptions';
-import { TextField, TextAreaField, SelectField } from './FormField';
+import { TextField, TextAreaField, SelectField, CheckboxField /* , FileField */ } from './FormField';
 import './InvoiceRequestForm.css';
 
 // Fields that, when changed, can affect whether Invoice Value/Project Value
@@ -38,14 +42,39 @@ export default function InvoiceRequestForm() {
   const [submitting, setSubmitting] = useState(false);
   const [submitResult, setSubmitResult] = useState(null); // { ok: boolean, message: string }
 
+  // Evidence file upload — commented out for now (see the "No Work Order"
+  // section below, which shows an informational message instead). Kept
+  // here, inactive, in case it comes back later:
+  // const [evidenceFile, setEvidenceFile] = useState(null);
+  // const fileInputRef = useRef(null);
+
+  // MIS project-info lookup, triggered by the "Fetch project details"
+  // checkbox next to PF Id.
+  const [fetchingProjectInfo, setFetchingProjectInfo] = useState(false);
+  const [projectInfoChecked, setProjectInfoChecked] = useState(false);
+  const [projectInfo, setProjectInfo] = useState(null); // raw API `data`, for the read-only panel
+  const [projectInfoError, setProjectInfoError] = useState('');
+
   // Cache every change as a draft so a refresh during testing doesn't lose
   // what's already been typed in.
   useEffect(() => {
     saveCachedFormData(DRAFT_CACHE_KEY, formData);
   }, [formData]);
 
+  // function resetEvidence() {
+  //   setEvidenceFile(null);
+  //   if (fileInputRef.current) fileInputRef.current.value = '';
+  // }
+
+  function resetProjectInfoLookup() {
+    setProjectInfoChecked(false);
+    setProjectInfo(null);
+    setProjectInfoError('');
+  }
+
   function handleChange(e) {
-    const { name, value } = e.target;
+    const { name, type } = e.target;
+    const value = type === 'checkbox' ? e.target.checked : e.target.value;
     let nextFormData;
 
     setFormData((prev) => {
@@ -54,17 +83,33 @@ export default function InvoiceRequestForm() {
       if (name === 'entity' && CURRENCY_BY_ENTITY[value]) {
         nextFormData.currency = CURRENCY_BY_ENTITY[value];
       }
+      // Consent/evidence only apply when there's no Work Order — clear them
+      // if the user switches back to "Yes" so stale data isn't submitted.
+      if (name === 'workOrder' && value !== 'No') {
+        nextFormData.noWorkOrderConsent = false;
+      }
       return nextFormData;
     });
 
+    // if (name === 'workOrder' && value !== 'No') {
+    //   resetEvidence();
+    // }
+
+    // Editing PF Id after a lookup invalidates that lookup — require
+    // re-verifying against the new value rather than leaving stale data.
+    if (name === 'pfId' && (projectInfoChecked || projectInfo || projectInfoError)) {
+      resetProjectInfoLookup();
+    }
+
     setErrors((prev) => {
-      if (!prev[name] && !VALUE_TRIGGER_FIELDS.includes(name)) return prev;
+      const touchesValueFields = VALUE_TRIGGER_FIELDS.includes(name);
+      if (!prev[name] && !touchesValueFields && name !== 'workOrder') return prev;
 
       const next = { ...prev };
       // Clear the edited field's own error right away — it may already be fixed.
       delete next[name];
 
-      if (VALUE_TRIGGER_FIELDS.includes(name)) {
+      if (touchesValueFields) {
         // Re-check the linked value fields too, so a stale cross-field
         // error (Invoice Value vs. Project Value, currency-converted)
         // clears as soon as the user fixes it, without waiting for blur.
@@ -76,20 +121,84 @@ export default function InvoiceRequestForm() {
           }
         });
       }
+
+      if (name === 'workOrder') {
+        delete next.noWorkOrderConsent;
+        // if (value !== 'No') delete next.evidenceFile; // file upload commented out
+      }
+
       return next;
     });
   }
 
   function handleBlur(e) {
-    const { name, value } = e.target;
+    const { name, type } = e.target;
+    const value = type === 'checkbox' ? e.target.checked : e.target.value;
     const error = validateField(name, value, formData);
     setErrors((prev) => ({ ...prev, [name]: error || undefined }));
+  }
+
+  // function handleEvidenceFileChange(e) {
+  //   const file = e.target.files && e.target.files.length > 0 ? e.target.files[0] : null;
+  //   setEvidenceFile(file);
+  //   setErrors((prev) => {
+  //     if (!prev.evidenceFile) return prev;
+  //     const next = { ...prev };
+  //     delete next.evidenceFile;
+  //     return next;
+  //   });
+  // }
+
+  async function handleFetchProjectInfoToggle(e) {
+    const checked = e.target.checked;
+
+    if (!checked) {
+      resetProjectInfoLookup();
+      return;
+    }
+
+    const pfId = formData.pfId.trim();
+    if (!pfId) {
+      // Leave the checkbox unchecked and point at the field that needs
+      // filling in first, instead of calling the API with nothing to look up.
+      setErrors((prev) => ({ ...prev, pfId: 'Enter PF Id before fetching project info.' }));
+      return;
+    }
+
+    setProjectInfoChecked(true);
+    setProjectInfoError('');
+    setProjectInfo(null);
+    setFetchingProjectInfo(true);
+
+    const result = await fetchProjectInfo(pfId);
+
+    setFetchingProjectInfo(false);
+
+    if (result.success) {
+      setProjectInfo(result.data);
+      const mapped = {};
+      Object.entries(MIS_FIELD_MAP).forEach(([apiKey, formKey]) => {
+        const apiValue = result.data[apiKey];
+        if (apiValue !== undefined && apiValue !== null && apiValue !== '') {
+          mapped[formKey] = apiValue;
+        }
+      });
+      if (Object.keys(mapped).length > 0) {
+        setFormData((prev) => ({ ...prev, ...mapped }));
+      }
+    } else {
+      // Uncheck so the user can fix something (e.g. the PF Id) and retry.
+      setProjectInfoChecked(false);
+      setProjectInfoError(result.error || 'Could not fetch project info.');
+    }
   }
 
   function handleClearDraft() {
     setFormData(INITIAL_FORM_STATE);
     setErrors({});
     setSubmitResult(null);
+    // resetEvidence(); // file upload commented out
+    resetProjectInfoLookup();
     clearCachedFormData(DRAFT_CACHE_KEY);
   }
 
@@ -98,6 +207,11 @@ export default function InvoiceRequestForm() {
     setSubmitResult(null);
 
     const allErrors = validateAll(formData);
+    // File upload commented out — evidence is no longer collected/required;
+    // see the info message shown in the "No Work Order" section instead.
+    // if (formData.workOrder === 'No' && !evidenceFile) {
+    //   allErrors.evidenceFile = 'Please attach a screenshot or email as evidence.';
+    // }
     setErrors(allErrors);
     if (Object.keys(allErrors).length > 0) {
       setSubmitResult({ ok: false, message: 'Please fix the highlighted fields.' });
@@ -106,11 +220,13 @@ export default function InvoiceRequestForm() {
 
     setSubmitting(true);
     try {
-      const result = await submitInvoiceRequest(formData);
+      const result = await submitInvoiceRequest(formData /*, evidenceFile */);
       if (result?.success) {
         setSubmitResult({ ok: true, message: result.message || 'Saved successfully.' });
         setFormData(INITIAL_FORM_STATE);
         setErrors({});
+        // resetEvidence(); // file upload commented out
+        resetProjectInfoLookup();
         clearCachedFormData(DRAFT_CACHE_KEY);
       } else {
         setSubmitResult({ ok: false, message: result?.message || 'Save failed. Please try again.' });
@@ -127,15 +243,33 @@ export default function InvoiceRequestForm() {
       <h1 className="invoice-form__title">Invoice Request</h1>
 
       <div className="invoice-form__grid">
-        <TextField
-          label="PF Id"
-          name="pfId"
-          value={formData.pfId}
-          placeholder="e.g. 2614/Retail-Diverse/1245"
-          error={errors.pfId}
-          onChange={handleChange}
-          onBlur={handleBlur}
-        />
+        <div className={`field ${errors.pfId ? 'has-error' : ''}`}>
+          <label htmlFor="pfId">
+            PF Id<span className="field__required">*</span>
+          </label>
+          <div className="field__pfid-row">
+            <input
+              id="pfId"
+              name="pfId"
+              type="text"
+              value={formData.pfId}
+              placeholder="e.g. 2614/Retail-Diverse/1245"
+              onChange={handleChange}
+              onBlur={handleBlur}
+            />
+            <label className="field__pfid-checkbox" htmlFor="fetchProjectInfo">
+              <input
+                id="fetchProjectInfo"
+                type="checkbox"
+                checked={projectInfoChecked}
+                disabled={fetchingProjectInfo}
+                onChange={handleFetchProjectInfoToggle}
+              />
+              <span>{fetchingProjectInfo ? 'Fetching…' : 'Fetch details'}</span>
+            </label>
+          </div>
+          {errors.pfId && <span className="field__error">{errors.pfId}</span>}
+        </div>
 
         <TextField
           label="Account Name"
@@ -146,6 +280,34 @@ export default function InvoiceRequestForm() {
           onChange={handleChange}
           onBlur={handleBlur}
         />
+
+        {projectInfoError && (
+          <div className="invoice-form__mis-error field--full" role="alert">
+            <span>{projectInfoError} Please fill the project details in manually.</span>
+            <button
+              type="button"
+              className="invoice-form__mis-error-dismiss"
+              onClick={() => setProjectInfoError('')}
+              aria-label="Dismiss"
+            >
+              ×
+            </button>
+          </div>
+        )}
+
+        {projectInfo && (
+          <div className="invoice-form__project-info field--full">
+            <p className="invoice-form__project-info-title">Project Info (from MIS)</p>
+            <dl className="invoice-form__project-info-list">
+              {Object.entries(projectInfo).map(([key, value]) => (
+                <div className="invoice-form__project-info-row" key={key}>
+                  <dt>{formatMisLabel(key)}</dt>
+                  <dd>{formatMisValue(value)}</dd>
+                </div>
+              ))}
+            </dl>
+          </div>
+        )}
 
         <TextField
           label="Client Name"
@@ -211,6 +373,42 @@ export default function InvoiceRequestForm() {
           onChange={handleChange}
           onBlur={handleBlur}
         />
+
+        {formData.workOrder === 'No' && (
+          <div className="invoice-form__no-wo field--full">
+            <p className="invoice-form__no-wo-title">No Work Order — consent required</p>
+
+            <CheckboxField
+              label="I confirm this invoice is being raised without a Work Order."
+              name="noWorkOrderConsent"
+              checked={formData.noWorkOrderConsent}
+              error={errors.noWorkOrderConsent}
+              onChange={handleChange}
+              onBlur={handleBlur}
+            />
+
+            {/* File upload commented out — evidence is no longer collected
+                here. Instead, just tell the requester to hold onto it themselves:
+            <FileField
+              label="Evidence (screenshot or email)"
+              name="evidenceFile"
+              inputRef={fileInputRef}
+              fileName={evidenceFile?.name}
+              accept={EVIDENCE_ACCEPT}
+              error={errors.evidenceFile}
+              onChange={handleEvidenceFileChange}
+              hint="Accepted: image, PDF, or an exported email (.eml/.msg)."
+            />
+            */}
+
+            {formData.noWorkOrderConsent && (
+              <p className="invoice-form__no-wo-note">
+                Please keep the evidence (screenshot or email) with you for future reference, since this invoice is
+                being generated without a Work Order.
+              </p>
+            )}
+          </div>
+        )}
 
         <TextField
           label="Master Project ID"

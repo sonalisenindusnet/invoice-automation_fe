@@ -33,6 +33,15 @@ export function validateEmailList(value) {
 // `formData` is optional and only needed for cross-field checks (Invoice
 // Value vs. Project Value below) — pass it whenever it's available.
 export function validateField(name, value, formData = {}) {
+  // Special-cased ahead of the generic required-check below: this is only
+  // required when Work Order is 'No', and a boolean `false` would
+  // otherwise be treated as "optional and empty, nothing to check".
+  if (name === 'noWorkOrderConsent') {
+    return formData.workOrder === 'No' && !value
+      ? 'Please confirm consent since no Work Order is provided.'
+      : null;
+  }
+
   const trimmed = typeof value === 'string' ? value.trim() : value;
 
   if (!OPTIONAL_FIELDS.has(name) && !trimmed) {
